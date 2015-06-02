@@ -2357,10 +2357,28 @@
 		animateScale : false,
 
 		//String - A legend template
-		legendTemplate : "<ul class=\"<%=name.toLowerCase()%>-legend\"><% for (var i=0; i<segments.length; i++){%><li><span style=\"background-color:<%=segments[i].fillColor%>\"></span><%if(segments[i].label){%><%=segments[i].label%><%}%></li><%}%></ul>"
+		legendTemplate : "<ul class=\"<%=name.toLowerCase()%>-legend\"><% for (var i=0; i<segments.length; i++){%><li><span style=\"background-color:<%=segments[i].fillColor%>\"><%if(segments[i].label){%><%=segments[i].label%><%}%></span></li><%}%></ul>"
+//********************** SKTS ************************//
+		//Boolean - Show Total in the Middle
+		showMiddleTotal : false,
+
+		//Boolean - Show Labels on Outside of Doughnut
+		showLabels : false,
+
+		// String - Scale label font declaration for the scale label
+		labelFontFamily: "'Helvetica Neue', 'Helvetica', 'Arial', sans-serif",
+
+		// Number - Scale label font size in pixels
+		labelFontSize: 14,
+
+		// Number - Padding for labels from Chart in px
+		labelPadding: 10,
+
+		//Integer - Size of pie
+		outerRadiusSection: 2
+//********************** SKTS ************************//
 
 	};
-
 
 	Chart.Type.extend({
 		//Passing in a name registers this chart in the Chart namespace
@@ -2373,7 +2391,12 @@
 
 			//Declare segments as a static property to prevent inheriting across the Chart type prototype
 			this.segments = [];
-			this.outerRadius = (helpers.min([this.chart.width,this.chart.height]) -	this.options.segmentStrokeWidth/2)/2;
+			
+			//SKTS - Makes at least a little room should labels be showing. Otherwise, there is no room for labels			
+			var outerRadiusSection = ((this.options.showLabels) && (this.options.outerRadiusSection < 2.5)) ? 2.5 : this.options.outerRadiusSection;
+
+			//SKTS - Shrink Pie in Context to fit/notFit labels
+			this.outerRadius = (helpers.min([this.chart.width,this.chart.height]) -	this.options.segmentStrokeWidth/2)/ outerRadiusSection;
 
 			this.SegmentArc = Chart.Arc.extend({
 				ctx : this.chart.ctx,
@@ -2398,6 +2421,9 @@
 			this.calculateTotal(data);
 
 			helpers.each(data,function(datapoint, index){
+				if (!datapoint.color) {
+					datapoint.color = 'hsl(' + (360 * index / data.length) + ', 100%, 50%)';
+				}
 				this.addData(datapoint, index, true);
 			},this);
 
@@ -2425,6 +2451,10 @@
 				strokeWidth : this.options.segmentStrokeWidth,
 				strokeColor : this.options.segmentStrokeColor,
 				startAngle : Math.PI * 1.5,
+				showLabels : this.options.showLabels, //SKTS - Add setting to the object
+				labelSize : this.options.labelFontSize, //SKTS - Add setting to the object
+				labelFontFamily : this.options.labelFontFamily, //SKTS - Add setting to the object
+				labelPadding : this.options.labelPadding, //SKTS - Add setting to the object
 				circumference : (this.options.animateRotate) ? 0 : this.calculateCircumference(segment.value),
 				label : segment.label
 			}));
@@ -2433,8 +2463,12 @@
 				this.update();
 			}
 		},
-		calculateCircumference : function(value){
-			return (Math.PI*2)*(Math.abs(value) / this.total);
+		calculateCircumference : function(value) {
+			if ( this.total > 0 ) {
+				return (Math.PI*2)*(value / this.total);
+			} else {
+				return 0;
+			}
 		},
 		calculateTotal : function(data){
 			this.total = 0;
@@ -2468,7 +2502,10 @@
 				x : this.chart.width/2,
 				y : this.chart.height/2
 			});
-			this.outerRadius = (helpers.min([this.chart.width,this.chart.height]) -	this.options.segmentStrokeWidth/2)/2;
+			//SKTS - Maintain correct ratio of chart using OuterRadiusSection
+			var outerRadiusSection = ((this.options.showLabels) && (this.options.outerRadiusSection < 2.5)) ? 2.5 : this.options.outerRadiusSection;
+
+			this.outerRadius = (helpers.min([this.chart.width,this.chart.height]) -	this.options.segmentStrokeWidth/2)/outerRadiusSection;
 			helpers.each(this.segments, function(segment){
 				segment.update({
 					outerRadius : this.outerRadius,
@@ -2501,6 +2538,12 @@
 		}
 	});
 
+	Chart.types.Doughnut.extend({
+		name : "Pie",
+		defaults : helpers.merge(defaultConfig,{percentageInnerCutout : 0})
+	});
+
+}).call(this);
 	Chart.types.Doughnut.extend({
 		name : "Pie",
 		defaults : helpers.merge(defaultConfig,{percentageInnerCutout : 0})
