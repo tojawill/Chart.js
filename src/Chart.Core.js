@@ -1320,6 +1320,25 @@
 			if (this.showStroke){
 				ctx.stroke();
 			}
+//********************** SKTS ************************//
+			//Draws labels
+			if(this.showLabels){
+				//Font settings need to be set in order to prevent them from being redrawn on events
+				ctx.textAlign = 'center';
+				ctx.textBaseline = 'middle';
+				ctx.font = fontString(this.labelSize, "normal", this.labelFontFamily);
+
+				//Finds the center of the section, then Looks at the text length and adds padding to that
+				var centreAngle = this.startAngle + ((this.endAngle - this.startAngle) / 2),
+					rangeFromCentre = this.outerRadius + ((ctx.measureText(this.label).width/ 2) + this.labelPadding);
+
+				var	labelPoint = {
+					x : this.x + (Math.cos(centreAngle) * rangeFromCentre),
+					y : this.y + (Math.sin(centreAngle) * rangeFromCentre)
+				}
+				ctx.fillText(this.label, labelPoint.x, labelPoint.y);
+			}
+//********************** SKTS ************************//	
 		}
 	});
 
