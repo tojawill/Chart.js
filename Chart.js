@@ -378,6 +378,7 @@
 			};
 		},
 		calculateOrderOfMagnitude = helpers.calculateOrderOfMagnitude = function(val){
+			// console.log(Math.floor(Math.log(val) / Math.LN10));
 			return Math.floor(Math.log(val) / Math.LN10);
 		},
 		calculateScaleRange = helpers.calculateScaleRange = function(valuesArray, drawingSize, textSize, startFromZero, integersOnly){
@@ -389,6 +390,8 @@
 
 			var maxValue = max(valuesArray),
 				minValue = min(valuesArray);
+
+				// console.log('min: ' + minValue + ', max:' + maxValue);
 
 			// We need some degree of seperation here to calculate the scales if all the values are the same
 			// Adding/minusing 0.5 will give us a range of 1.
@@ -406,11 +409,15 @@
 
 			var	valueRange = Math.abs(maxValue - minValue),
 				rangeOrderOfMagnitude = calculateOrderOfMagnitude(valueRange),
-				graphMax = Math.ceil(maxValue / (1 * Math.pow(10, rangeOrderOfMagnitude))) * Math.pow(10, rangeOrderOfMagnitude),
+				graphMax = maxValue + Math.ceil(maxValue /10),
 				graphMin = (startFromZero) ? 0 : Math.floor(minValue / (1 * Math.pow(10, rangeOrderOfMagnitude))) * Math.pow(10, rangeOrderOfMagnitude),
 				graphRange = graphMax - graphMin,
-				stepValue = Math.pow(10, rangeOrderOfMagnitude),
+				stepValue = 1,
 				numberOfSteps = Math.round(graphRange / stepValue);
+				// console.log( Math.ceil(maxValue / (1 * Math.pow(10, rangeOrderOfMagnitude))) );
+				// console.log( Math.pow(10, rangeOrderOfMagnitude) );
+				// console.log(graphMax);
+
 
 			//If we have more space on the graph we'll use it to give more definition to the data
 			while((numberOfSteps > maxSteps || (numberOfSteps * 2) < maxSteps) && !skipFitting) {
@@ -699,7 +706,7 @@
 				if (currentStep < totalSteps){
 					chartInstance.animationFrame = requestAnimFrame(animationFrame);
 				} else{
-					onComplete.apply(chartInstance);
+					onComplete.apply(chartInstance);					
 				}
 			};
 			requestAnimFrame(animationFrame);
@@ -880,6 +887,7 @@
 			}
 			else{
 				this.draw();
+				this.drawTotal();
 				this.options.onAnimationComplete.call(this);
 			}
 			return this;
@@ -1220,6 +1228,8 @@
 
 			var ctx = this.ctx;
 
+			// console.log(this);
+
 			ctx.beginPath();
 
 			ctx.arc(this.x, this.y, this.outerRadius, this.startAngle, this.endAngle);
@@ -1238,6 +1248,26 @@
 			if (this.showStroke){
 				ctx.stroke();
 			}
+
+//********************** SKTS ************************//
+			//Draws labels
+			if(this.showLabels){
+				//Font settings need to be set in order to prevent them from being redrawn on events
+				ctx.textAlign = 'center';
+				ctx.textBaseline = 'middle';
+				ctx.font = fontString(this.labelSize, "normal", this.labelFontFamily);
+
+				//Finds the center of the section, then Looks at the text length and adds padding to that
+				var centreAngle = this.startAngle + ((this.endAngle - this.startAngle) / 2),
+					rangeFromCentre = this.outerRadius + ((ctx.measureText(this.label).width/ 2) + this.labelPadding);
+
+				var	labelPoint = {
+					x : this.x + (Math.cos(centreAngle) * rangeFromCentre),
+					y : this.y + (Math.sin(centreAngle) * rangeFromCentre)
+				}
+				ctx.fillText(this.label, labelPoint.x, labelPoint.y);
+			}
+//********************** SKTS ************************//			
 		}
 	});
 
@@ -2345,7 +2375,7 @@
 		percentageInnerCutout : 50,
 
 		//Number - Amount of animation steps
-		animationSteps : 100,
+		animationSteps : 75,
 
 		//String - Animation easing effect
 		animationEasing : "easeOutBounce",
@@ -2357,7 +2387,7 @@
 		animateScale : false,
 
 		//String - A legend template
-		legendTemplate : "<ul class=\"<%=name.toLowerCase()%>-legend\"><% for (var i=0; i<segments.length; i++){%><li><span style=\"background-color:<%=segments[i].fillColor%>\"><%if(segments[i].label){%><%=segments[i].label%><%}%></span></li><%}%></ul>"
+		legendTemplate : "<ul class=\"<%=name.toLowerCase()%>-legend\"><% for (var i=0; i<segments.length; i++){%><li><span style=\"background-color:<%=segments[i].fillColor%>\"></span><%if(segments[i].label){%><%=segments[i].label%><%}%></li><%}%></ul>",
 //********************** SKTS ************************//
 		//Boolean - Show Total in the Middle
 		showMiddleTotal : false,
@@ -2377,8 +2407,8 @@
 		//Integer - Size of pie
 		outerRadiusSection: 2
 //********************** SKTS ************************//
-
 	};
+
 
 	Chart.Type.extend({
 		//Passing in a name registers this chart in the Chart namespace
@@ -2388,10 +2418,9 @@
 		//Initialize is fired when the chart is initialized - Data is passed in as a parameter
 		//Config is automatically merged by the core of Chart.js, and is available at this.options
 		initialize:  function(data){
-
 			//Declare segments as a static property to prevent inheriting across the Chart type prototype
 			this.segments = [];
-			
+
 			//SKTS - Makes at least a little room should labels be showing. Otherwise, there is no room for labels			
 			var outerRadiusSection = ((this.options.showLabels) && (this.options.outerRadiusSection < 2.5)) ? 2.5 : this.options.outerRadiusSection;
 
@@ -2421,12 +2450,8 @@
 			this.calculateTotal(data);
 
 			helpers.each(data,function(datapoint, index){
-				if (!datapoint.color) {
-					datapoint.color = 'hsl(' + (360 * index / data.length) + ', 100%, 50%)';
-				}
 				this.addData(datapoint, index, true);
 			},this);
-
 			this.render();
 		},
 		getSegmentsAtEvent : function(e){
@@ -2448,13 +2473,13 @@
 				fillColor : segment.color,
 				highlightColor : segment.highlight || segment.color,
 				showStroke : this.options.segmentShowStroke,
-				strokeWidth : this.options.segmentStrokeWidth,
-				strokeColor : this.options.segmentStrokeColor,
-				startAngle : Math.PI * 1.5,
 				showLabels : this.options.showLabels, //SKTS - Add setting to the object
 				labelSize : this.options.labelFontSize, //SKTS - Add setting to the object
 				labelFontFamily : this.options.labelFontFamily, //SKTS - Add setting to the object
 				labelPadding : this.options.labelPadding, //SKTS - Add setting to the object
+				strokeWidth : this.options.segmentStrokeWidth,
+				strokeColor : this.options.segmentStrokeColor,
+				startAngle : Math.PI * 1.5,
 				circumference : (this.options.animateRotate) ? 0 : this.calculateCircumference(segment.value),
 				label : segment.label
 			}));
@@ -2463,12 +2488,8 @@
 				this.update();
 			}
 		},
-		calculateCircumference : function(value) {
-			if ( this.total > 0 ) {
-				return (Math.PI*2)*(value / this.total);
-			} else {
-				return 0;
-			}
+		calculateCircumference : function(value){
+			return (Math.PI*2)*(Math.abs(value) / this.total);
 		},
 		calculateTotal : function(data){
 			this.total = 0;
@@ -2502,6 +2523,7 @@
 				x : this.chart.width/2,
 				y : this.chart.height/2
 			});
+
 			//SKTS - Maintain correct ratio of chart using OuterRadiusSection
 			var outerRadiusSection = ((this.options.showLabels) && (this.options.outerRadiusSection < 2.5)) ? 2.5 : this.options.outerRadiusSection;
 
@@ -2512,6 +2534,7 @@
 					innerRadius : (this.outerRadius/100) * this.options.percentageInnerCutout
 				});
 			}, this);
+			this.drawTotal();
 		},
 		draw : function(easeDecimal){
 			var animDecimal = (easeDecimal) ? easeDecimal : 1;
@@ -2534,8 +2557,7 @@
 					this.segments[index+1].startAngle = segment.endAngle;
 				}
 			},this);
-
-		}
+		},
 	});
 
 	Chart.types.Doughnut.extend({
@@ -2544,12 +2566,7 @@
 	});
 
 }).call(this);
-	Chart.types.Doughnut.extend({
-		name : "Pie",
-		defaults : helpers.merge(defaultConfig,{percentageInnerCutout : 0})
-	});
 
-}).call(this);
 (function(){
 	"use strict";
 
@@ -3175,6 +3192,7 @@
 	});
 
 }).call(this);
+
 (function(){
 	"use strict";
 
